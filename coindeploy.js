@@ -1,4 +1,5 @@
 // File: coindeploy.js
+import fetch from 'node-fetch'
 import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
@@ -16,11 +17,12 @@ const {
   PRIVATE_KEY,
   COIN_ADDRESS,
   PINATA_API_KEY,
-  PINATA_API_SECRET
+  PINATA_API_SECRET,
+  IMAGE_URL // e.g. https://creeper-7pr1.onrender.com/latest.png
 } = process.env
 
-if (!RPC_URL || !PRIVATE_KEY || !COIN_ADDRESS || !PINATA_API_KEY || !PINATA_API_SECRET) {
-  console.error('Error: Missing one of RPC_URL, PRIVATE_KEY, COIN_ADDRESS, PINATA_API_KEY, or PINATA_API_SECRET')
+if (!RPC_URL || !PRIVATE_KEY || !COIN_ADDRESS || !PINATA_API_KEY || !PINATA_API_SECRET || !IMAGE_URL) {
+  console.error('Error: Missing one of RPC_URL, PRIVATE_KEY, COIN_ADDRESS, PINATA_API_KEY, PINATA_API_SECRET, or IMAGE_URL')
   process.exit(1)
 }
 
@@ -35,35 +37,36 @@ const walletClient = createWalletClient({
 
 async function main() {
   try {
-    // 1) Pin the latest snapshot image
-    const imagePath = path.resolve('snapshots', 'creeper.png')
-    console.log('→ Pinning image:', imagePath)
+    // 1) Download the latest snapshot image
+    console.log('→ Downloading image from:', IMAGE_URL)
+    const imgRes = await fetch(IMAGE_URL)
+    if (!imgRes.ok) throw new Error(`Failed to download image: HTTP ${imgRes.status}`)
+    const imgStream = imgRes.body
+
+    // 2) Pin the image
+    console.log('→ Pinning image...')
     const pinFileRes = await pinata.pinFileToIPFS(
-      fs.createReadStream(imagePath),
-      {
-        pinataMetadata: { name: 'creeper.png' }
-      }
+      imgStream,
+      { pinataMetadata: { name: path.basename(IMAGE_URL) } }
     )
     const imageCID = pinFileRes.IpfsHash ?? pinFileRes.cid
     console.log('✓ Image pinned at', imageCID)
 
-    // 2) Load and update metadata.json
+    // 3) Load and update metadata.json
     const metadataPath = path.resolve('metadata.json')
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'))
     metadata.image = `ipfs://${imageCID}`
 
-    // 3) Pin the updated JSON metadata
+    // 4) Pin the updated JSON metadata
     console.log('→ Pinning updated metadata JSON...')
     const pinJsonRes = await pinata.pinJSONToIPFS(
       metadata,
-      {
-        pinataMetadata: { name: 'metadata.json' }
-      }
+      { pinataMetadata: { name: 'metadata.json' } }
     )
     const metadataCID = pinJsonRes.IpfsHash ?? pinJsonRes.cid
     console.log('✓ Metadata JSON pinned at', metadataCID)
 
-    // 4) Update the coin's metadata URI on-chain
+    // 5) Update the coin's metadata URI on-chain
     const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI to', newURI)
     const result = await updateCoinURI(
