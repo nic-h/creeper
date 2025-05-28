@@ -6,6 +6,7 @@
     "start": "node app.js"
   },
   "dependencies": {
+    "@pinata/sdk": "^2.1.0",
     "@zoralabs/coins-sdk": "^0.1.1",
     "canvas": "^2.11.2",
     "dotenv": "^16.5.0",
