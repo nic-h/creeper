@@ -101,7 +101,7 @@ async function snapshotGrid() {
     path.join('snapshots', 'creeper.png'),
     canvas.toBuffer('image/png')
   )
-  console.log('✅ latest.png written')
+  console.log('✅ creeper.png written')
 }
 
 // run once + schedule
@@ -110,7 +110,7 @@ setInterval(snapshotGrid, INTERVAL)
 
 // Serve the latest snapshot
 app.get('/latest.png', (req, res) => {
-  const file = path.resolve('snapshots', 'latest.png')
+  const file = path.resolve('snapshots', 'creeper.png')
   res.sendFile(file)
 })
 
