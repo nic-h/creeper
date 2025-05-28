@@ -1,9 +1,9 @@
 {
-  "name": "Global 4-Cam Creeper",
-  "description": "2×2 black-and-white CCTV grid updated every 5 minutes, with green tint, location labels, and centered “CREEPER”",
-  "image": "snapshots/latest.png",
+  "name": "CREEPER",
+  "description": "Creeper is a 4 x CCTV Camera work that updates every five minutes",
+  "image": "https://creeper-7pr1.onrender.com/latest.png",
   "properties": {
     "updateInterval": "5m",
-    "layout": "2×2"
+    "layout": "2x2"
   }
 }
