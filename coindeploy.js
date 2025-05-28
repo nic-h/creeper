@@ -2,7 +2,8 @@
 import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
-import pinataSDK from '@pinata/sdk'
+import pinataSDK from '@pinata/sdk' // Pinata SDK as class
+
 import { updateCoinURI } from '@zoralabs/coins-sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -23,7 +24,7 @@ if (!RPC_URL || !PRIVATE_KEY || !COIN_ADDRESS || !PINATA_API_KEY || !PINATA_API_
 }
 
 // ─── Initialize Pinata and Viem clients ────────────────────────────────────────
-const pinata = pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+const pinata = new pinataSDK(PINATA_API_KEY, PINATA_API_SECRET) // instantiate PinataSDK
 
 const publicClient = createPublicClient({
   chain: base,
