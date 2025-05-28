@@ -117,6 +117,7 @@ app.get('/latest.png', (req, res) => {
 // Serve metadata.json
 app.get('/metadata.json', (req, res) => {
   const file = path.resolve('metadata.json')
+  res.type('application/json')      // ensure JSON content-type
   res.sendFile(file)
 })
 
