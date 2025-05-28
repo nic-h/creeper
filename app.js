@@ -6,6 +6,8 @@ import fs       from 'fs'
 import path     from 'path'
 import dotenv   from 'dotenv'
 dotenv.config()
+const app = express();
+
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 const CAMERAS   = JSON.parse(process.env.CAMERAS)
@@ -111,3 +113,20 @@ async function snapshotGrid() {
 
 // run once
 snapshotGrid()
+setInterval(snapshotGrid, INTERVAL);
+// Serve the latest snapshot
+app.get('/latest.png', (req, res) => {
+  const file = path.resolve('snapshots', 'latest.png');
+  res.sendFile(file);
+});
+
+// Serve metadata.json
+app.get('/metadata.json', (req, res) => {
+  const file = path.resolve('metadata.json');
+  res.sendFile(file);
+});
+
+// Start the HTTP server
+app.listen(PORT, () => {
+  console.log(`✅ Server listening on port ${PORT}`);
+});
