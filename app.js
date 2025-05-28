@@ -118,7 +118,7 @@ app.get('/latest.png', (req, res) => {
 app.get('/metadata.json', (req, res) => {
   const json = fs.readFileSync(path.resolve('metadata.json'), 'utf8')
   res.setHeader('Content-Type', 'application/json')
-  res.send(json)
+  res.end(json)
 })
 
 // Start the HTTP server
