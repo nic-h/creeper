@@ -98,7 +98,7 @@ async function snapshotGrid() {
   // 8) Save PNG
   fs.mkdirSync('snapshots', { recursive: true })
   fs.writeFileSync(
-    path.join('snapshots', 'latest.png'),
+    path.join('snapshots', 'creeper.png'),
     canvas.toBuffer('image/png')
   )
   console.log('✅ latest.png written')
