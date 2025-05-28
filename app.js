@@ -1,31 +1,29 @@
-// creeper/app.js
+// File: app.js
 import express from 'express'
 import fetch    from 'node-fetch'
 import { createCanvas, loadImage } from 'canvas'
 import fs       from 'fs'
 import path     from 'path'
 import dotenv   from 'dotenv'
-dotenv.config()
-const app = express();
 
+dotenv.config()
+const app = express()
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 const CAMERAS   = JSON.parse(process.env.CAMERAS)
 const PORT      = Number(process.env.PORT) || 3000
 const SIZE      = 2048
 const GRID      = SIZE / 2      // each cell = 1024×1024
-const BORDER    = 20            // black gutter
-const INTERVAL  = 5 * 60 * 1000 // 5 min
+const BORDER    = 8             // padding inside each cell
+const INTERVAL  = 1000 * 60 * 5 // 5 minutes for snapshots
 
-// ─── Core snapshot function ────────────────────────────────────────────────────
+// ─── Helper: draw one snapshot ─────────────────────────────────────────────────
 async function snapshotGrid() {
-  console.log('🔄 snapshot start @', new Date().toISOString())
-
-  // 1) Set up canvas
+  // 1) Create canvas
   const canvas = createCanvas(SIZE, SIZE)
   const ctx    = canvas.getContext('2d')
 
-  // 2) Black gutters
+  // 2) Clear to black
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, SIZE, SIZE)
 
@@ -33,6 +31,10 @@ async function snapshotGrid() {
   for (let i = 0; i < 4; i++) {
     const cam = CAMERAS[i]
     if (!cam) continue
+
+    const dx    = (i % 2) * GRID + BORDER
+    const dy    = Math.floor(i / 2) * GRID + BORDER
+    const inner = GRID - 2 * BORDER
 
     try {
       const ts    = Date.now()
@@ -43,36 +45,30 @@ async function snapshotGrid() {
       const buf = await res.buffer()
       const img = await loadImage(buf)
       console.log(`✓ [cam ${i}] loaded (${img.width}×${img.height})`)
-
-      // center-crop square
       const side = Math.min(img.width, img.height)
       const sx   = (img.width  - side) / 2
       const sy   = (img.height - side) / 2
-
-      // dest coords & size
-      const dx    = (i % 2) * GRID + BORDER
-      const dy    = Math.floor(i / 2) * GRID + BORDER
-      const inner = GRID - 2 * BORDER
-
       ctx.drawImage(img, sx, sy, side, side, dx, dy, inner, inner)
       console.log(`✓ [cam ${i}] drawn at (${dx},${dy}) size ${inner}`)
     } catch (err) {
       console.error(`❌ [cam ${i}] error:`, err.message)
-      // continue to next camera
+      // fallback: draw gray box so it isn't pure black
+      ctx.fillStyle = '#444'
+      ctx.fillRect(dx, dy, inner, inner)
     }
   }
 
   // 4) Grayscale conversion
   const data = ctx.getImageData(0, 0, SIZE, SIZE)
-  for (let p = 0; p < data.data.length; p += 4) {
-    const r   = data.data[p]
-    const g   = data.data[p+1]
-    const b   = data.data[p+2]
-    const lum = 0.299*r + 0.587*g + 0.114*b
-    data.data[p] = data.data[p+1] = data.data[p+2] = lum
+  const pix  = data.data
+  for (let i = 0; i < pix.length; i += 4) {
+    const avg = (pix[i] + pix[i+1] + pix[i+2]) / 3
+    pix[i]   = avg
+    pix[i+1] = avg
+    pix[i+2] = avg
   }
   ctx.putImageData(data, 0, 0)
-  console.log('✓ converted to grayscale')
+  console.log('✓ applied grayscale')
 
   // 5) Light green tint overlay
   ctx.save()
@@ -88,19 +84,16 @@ async function snapshotGrid() {
   ctx.textAlign    = 'left'
   ctx.textBaseline = 'bottom'
   CAMERAS.forEach(({ location }, i) => {
-    const x = (i % 2) * GRID + BORDER + 10
-    const y = Math.floor(i / 2) * GRID + GRID - BORDER - 10
+    const x = (i % 2) * GRID + BORDER + 8
+    const y = Math.floor(i / 2) * GRID + GRID - BORDER - 8
     ctx.fillText(location, x, y)
   })
-  console.log('✓ drew location labels')
+  console.log('✓ drew locations')
 
-  // 7) Centered “CREEPER”
-  ctx.fillStyle    = '#00FF00'
-  ctx.font         = '96px monospace'
-  ctx.textAlign    = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('CREEPER', SIZE/2, SIZE/2)
-  console.log('✓ drew CREEPER')
+  // 7) CREEPER overlay
+  const svgImg = await loadImage(path.resolve('overlay.svg'))
+  ctx.drawImage(svgImg, 0, 0, SIZE, SIZE)
+  console.log('✓ drew CREEPER overlay')
 
   // 8) Save PNG
   fs.mkdirSync('snapshots', { recursive: true })
@@ -111,22 +104,23 @@ async function snapshotGrid() {
   console.log('✅ latest.png written')
 }
 
-// run once
+// run once + schedule
 snapshotGrid()
-setInterval(snapshotGrid, INTERVAL);
+setInterval(snapshotGrid, INTERVAL)
+
 // Serve the latest snapshot
 app.get('/latest.png', (req, res) => {
-  const file = path.resolve('snapshots', 'latest.png');
-  res.sendFile(file);
-});
+  const file = path.resolve('snapshots', 'latest.png')
+  res.sendFile(file)
+})
 
 // Serve metadata.json
 app.get('/metadata.json', (req, res) => {
-  const file = path.resolve('metadata.json');
-  res.sendFile(file);
-});
+  const file = path.resolve('metadata.json')
+  res.sendFile(file)
+})
 
 // Start the HTTP server
 app.listen(PORT, () => {
-  console.log(`✅ Server listening on port ${PORT}`);
-});
+  console.log(`✅ Server listening on port ${PORT}`)
+})
