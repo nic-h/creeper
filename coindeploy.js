@@ -25,7 +25,7 @@ if (!RPC_URL || !PRIVATE_KEY || !COIN_ADDRESS || !PINATA_API_KEY || !PINATA_API_
 }
 
 // Initialize Pinata and Viem clients
-const pinata = pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+const pinata = new pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
 const publicClient = createPublicClient({ chain: base, transport: http(RPC_URL) })
 const walletClient = createWalletClient({
   chain: base,
