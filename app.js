@@ -1,10 +1,10 @@
 // File: app.js
 import express from 'express'
-import fetch    from 'node-fetch'
+import fetch from 'node-fetch'
 import { createCanvas, loadImage } from 'canvas'
-import fs       from 'fs'
-import path     from 'path'
-import dotenv   from 'dotenv'
+import fs from 'fs'
+import path from 'path'
+import dotenv from 'dotenv'
 
 dotenv.config()
 const app = express()
@@ -114,11 +114,11 @@ app.get('/latest.png', (req, res) => {
   res.sendFile(file)
 })
 
-// Serve metadata.json
+// Serve metadata.json with strict JSON header
 app.get('/metadata.json', (req, res) => {
-  const file = path.resolve('metadata.json')
-  res.type('application/json')      // ensure JSON content-type
-  res.sendFile(file)
+  const json = fs.readFileSync(path.resolve('metadata.json'), 'utf8')
+  res.setHeader('Content-Type', 'application/json')
+  res.send(json)
 })
 
 // Start the HTTP server
