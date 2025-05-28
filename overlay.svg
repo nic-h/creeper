@@ -1,0 +1,11 @@
+<svg width="2048" height="2048" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .creeper { fill: #0F0; font-family: monospace; font-size:128px; font-weight:bold; }
+  </style>
+  <text class="creeper"
+        x="1024" y="1024"
+        text-anchor="middle"
+        dominant-baseline="middle">
+    CREEPER
+  </text>
+</svg>
