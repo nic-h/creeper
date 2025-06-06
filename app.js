@@ -56,6 +56,7 @@ async function generateGrid() {
 
     try {
       const url = cam.url.replace('COUNTER', Date.now())
+      console.log(`Fetching camera ${i}: ${url}`)
       const resp = await fetch(url)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 
@@ -63,6 +64,7 @@ async function generateGrid() {
       const img = await loadImage(buffer)
       ctx.drawImage(img, x, y, GRID, GRID)
       drawLabel(ctx, cam.location, x + 10, y + 10)
+      console.log(`✅ Camera ${i} loaded successfully`)
     } catch (err) {
       console.error(`❌ [cam ${i}] Error:`, err.message)
     }
@@ -89,8 +91,12 @@ async function generateGrid() {
 
     setInterval(async () => {
       console.log('🔄 Generating new snapshot...')
-      const newPath = await generateGrid()
-      console.log(`✅ ${OUTPUT_IMG} written (${newPath})`)
+      try {
+        const newPath = await generateGrid()
+        console.log(`✅ ${OUTPUT_IMG} written (${newPath})`)
+      } catch (err) {
+        console.error('❌ Error during scheduled snapshot:', err)
+      }
     }, INTERVAL)
   } catch (err) {
     console.error('❌ Error generating initial snapshot:', err)
@@ -99,7 +105,12 @@ async function generateGrid() {
 
 // Serve the latest image at /latest.png
 app.get('/latest.png', (req, res) => {
-  res.sendFile(path.resolve(OUTPUT, OUTPUT_IMG))
+  const filePath = path.resolve(OUTPUT, OUTPUT_IMG)
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath)
+  } else {
+    res.status(404).send('No image available yet')
+  }
 })
 
 // (Optional) Serve a static metadata JSON at /metadata.json
