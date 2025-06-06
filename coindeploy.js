@@ -1,4 +1,4 @@
-// File: coindeploy.js
+// coindeploy.js
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
@@ -36,12 +36,10 @@ const {
 } = process.env
 
 // ─── 2. Initialize Infura IPFS client & Viem clients ──────────────────────────
-// Construct Basic auth header for Infura IPFS
 const auth =
   'Basic ' +
   Buffer.from(`${INFURA_IPFS_PROJECT_ID}:${INFURA_IPFS_PROJECT_SECRET}`).toString('base64')
 
-// Create Infura IPFS client
 const ipfs = createIpfsClient({
   host: 'ipfs.infura.io',
   port: 5001,
@@ -86,17 +84,14 @@ async function main() {
 
     // 3.2) Pin the PNG to IPFS via Infura
     console.log('→ Pinning image to IPFS (Infura)...')
-    const imageAddResult = await ipfs.add(imgBuffer, {
-      pin: true
-    })
+    const imageAddResult = await ipfs.add(imgBuffer, { pin: true })
     const imageCID = imageAddResult.cid.toString()
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG over HTTPS
+    // 3.3) Build metadata JSON pointing at the PNG over HTTP
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Zora’s front‐end needs an HTTPS image URL, but we'll embed ipfs:// for image; Zora will load the JSON over IPFS.
       image: `ipfs://${imageCID}`,
       animation_url: `ipfs://${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
@@ -114,13 +109,11 @@ async function main() {
 
     // 3.4) Pin metadata JSON to IPFS via Infura
     console.log('→ Pinning metadata JSON to IPFS (Infura)...')
-    const metadataAddResult = await ipfs.add(JSON.stringify(metadata), {
-      pin: true
-    })
+    const metadataAddResult = await ipfs.add(JSON.stringify(metadata), { pin: true })
     const metadataCID = metadataAddResult.cid.toString()
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Wait a few seconds for Infura to propagate to public gateways
+    // 3.5) Wait a few seconds for Infura propagation
     console.log('⏳ Waiting 5 seconds for IPFS propagation...')
     await new Promise(resolve => setTimeout(resolve, 5000))
 
@@ -136,7 +129,7 @@ async function main() {
     console.log('✓ Transaction submitted:', result.hash)
     console.log('✅ Creeper coin metadata updated successfully!')
 
-    // 3.7) Log a summary
+    // 3.7) Log summary
     console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
     console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
