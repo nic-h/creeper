@@ -55,8 +55,9 @@ async function generateGrid() {
     const y = row * GRID
 
     try {
-      console.log(`Fetching camera ${i}: ${cam.url}`)
-      const resp = await fetch(`${cam.url}?t=${Date.now()}`, {
+      const cameraUrl = cam.url.replace('COUNTER', Date.now())
+      console.log(`Fetching camera ${i}: ${cameraUrl}`)
+      const resp = await fetch(cameraUrl, {
         timeout: 10000,
         headers: {
           'User-Agent': 'Creeper-CCTV-Bot/1.0'
