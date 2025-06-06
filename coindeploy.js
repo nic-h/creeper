@@ -10,7 +10,7 @@ import { base } from 'viem/chains'
 
 dotenv.config()
 
-// ─── 1. Validate env vars ─────────────────────────────────────────────────
+// ─── 1. Validate required environment variables ────────────────────────────────
 const requiredEnvVars = [
   'RPC_URL',
   'PRIVATE_KEY',
@@ -35,8 +35,8 @@ const {
   IMAGE_URL
 } = process.env
 
-// ─── 2. Initialize Pinata & Viem clients ─────────────────────────────────────
-const pinata = pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+// ─── 2. Initialize Pinata & Viem clients ───────────────────────────────────────
+const pinata = new pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
 
 const publicClient = createPublicClient({
   chain: base,
@@ -49,7 +49,7 @@ const walletClient = createWalletClient({
   account: privateKeyToAccount(PRIVATE_KEY)
 })
 
-// ─── 3. Main function ────────────────────────────────────────────────────────
+// ─── 3. Main update function ───────────────────────────────────────────────────
 async function main() {
   try {
     console.log('🚀 Starting Creeper coin update...')
@@ -85,15 +85,14 @@ async function main() {
     const imageCID = pinFileRes.IpfsHash
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG CID
-    //      *Note:* We’ll also set an HTTP gateway field for immediate availability.
+    // 3.3) Build metadata JSON pointing at the PNG CID (plus HTTPS fallback)
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Use ipfs:// for “native” but we’ll update the on-chain URI to an HTTPS gateway
+      // Native IPFS reference (for completeness)
       image: `ipfs://${imageCID}`,
       animation_url: `ipfs://${imageCID}`,
-      // Add a direct-HTTPS fallback so Zora/Browsers never hit IPFS protocol
+      // HTTPS fallback so Zora and browsers do not need IPFS protocol
       image_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
       properties: {
@@ -116,7 +115,7 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain—pointing to the Cloudflare gateway version
+    // 3.5) Update coin URI on-chain—use HTTPS gateway instead of ipfs://
     const newURI = `https://cloudflare-ipfs.com/ipfs/${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
@@ -128,8 +127,8 @@ async function main() {
     console.log('✓ Transaction submitted:', result.hash)
     console.log('✅ Creeper coin metadata updated successfully!')
 
-    // 3.6) Log a brief summary
-    console.log('\n📊 Summary:')
+    // 3.6) Log a summary
+    console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):        ipfs://${imageCID}`)
     console.log(`- Metadata (IPFS):   ipfs://${metadataCID}`)
     console.log(`- Metadata (HTTPS):  ${newURI}`)
