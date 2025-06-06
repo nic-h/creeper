@@ -71,7 +71,7 @@ async function run() {
     .creeper { fill: #0F0; font-family: monospace; font-size:128px; font-weight:bold; }
   </style>
   <text class="creeper"
-        x="${SIZE/2}" y="${SIZE/2}"
+        x="${SIZE/3}" y="${SIZE/3}"
         text-anchor="middle"
         dominant-baseline="middle">
     CREEPER
