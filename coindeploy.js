@@ -85,15 +85,13 @@ async function main() {
     const imageCID = pinFileRes.IpfsHash
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG CID (plus HTTPS fallback)
+    // 3.3) Build metadata JSON pointing at the PNG over HTTPS
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Native IPFS reference
-      image: `ipfs://${imageCID}`,
-      animation_url: `ipfs://${imageCID}`,
-      // HTTPS fallback so Zora and browsers do not need IPFS protocol
-      image_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
+      // Use HTTPS gateway so Zora’s UI fetches over HTTP
+      image: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
+      animation_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
       properties: {
         updateInterval: "5m",
@@ -108,14 +106,14 @@ async function main() {
     }
 
     // 3.4) Pin metadata JSON to IPFS
-    console.log('→ Pinning metadata JSON to Pinata...')
+    console.log('→ Pinning metadata JSON to IPFS...')
     const pinJsonRes = await pinata.pinJSONToIPFS(metadata, {
       pinataMetadata: { name: `creeper-metadata-${timestamp}.json` }
     })
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain (must be ipfs://<CID> per Zora SDK)
+    // 3.5) Update coin URI on-chain (must use ipfs://<CID>)
     const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
