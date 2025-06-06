@@ -1,6 +1,6 @@
 // File: coindeploy.js
+
 import fetch from 'node-fetch'
-import fs from 'fs'
 import dotenv from 'dotenv'
 import pinataSDK from '@pinata/sdk'
 import { updateCoinURI } from '@zoralabs/coins-sdk'
@@ -8,10 +8,9 @@ import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
 
-
-// ─── Load & validate environment ─────────────────────────────────────────────────
 dotenv.config()
 
+// ─── 1. Validate env vars ─────────────────────────────────────────────────
 const requiredEnvVars = [
   'RPC_URL',
   'PRIVATE_KEY',
@@ -21,10 +20,9 @@ const requiredEnvVars = [
   'IMAGE_URL'
 ]
 
-const missingVars = requiredEnvVars.filter((k) => !process.env[k])
-if (missingVars.length > 0) {
-  console.error('❌ Missing required environment variables:', missingVars.join(', '))
-  console.error('Please set these in Render Environment Variables')
+const missing = requiredEnvVars.filter((k) => !process.env[k])
+if (missing.length > 0) {
+  console.error('❌ Missing required environment variables:', missing.join(', '))
   process.exit(1)
 }
 
@@ -37,8 +35,8 @@ const {
   IMAGE_URL
 } = process.env
 
-// ─── Initialize Pinata & Viem clients ─────────────────────────────────────────────
-const pinata = new pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+// ─── 2. Initialize Pinata & Viem clients ─────────────────────────────────────
+const pinata = pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
 
 const publicClient = createPublicClient({
   chain: base,
@@ -51,15 +49,14 @@ const walletClient = createWalletClient({
   account: privateKeyToAccount(PRIVATE_KEY)
 })
 
-
-// ─── Main update loop ──────────────────────────────────────────────────────────────
+// ─── 3. Main function ────────────────────────────────────────────────────────
 async function main() {
   try {
     console.log('🚀 Starting Creeper coin update...')
     console.log(`📸 Image URL: ${IMAGE_URL}`)
     console.log(`🪙 Coin address: ${COIN_ADDRESS}`)
 
-    // 1) Download fresh image (add cache-buster)
+    // 3.1) Download the latest grid PNG (cache-busted)
     const imageUrlWithTimestamp = `${IMAGE_URL}?t=${Date.now()}`
     console.log('→ Downloading image from:', imageUrlWithTimestamp)
 
@@ -67,7 +64,6 @@ async function main() {
     if (!imgRes.ok) {
       throw new Error(`Failed to download image: HTTP ${imgRes.status} ${imgRes.statusText}`)
     }
-
     const contentType = imgRes.headers.get('content-type')
     console.log(`✓ Image downloaded (Content-Type: ${contentType})`)
 
@@ -75,9 +71,8 @@ async function main() {
     const sizeKB = (imgBuffer.length / 1024).toFixed(1)
     console.log(`✓ Image size: ${sizeKB}KB`)
 
-    // 2) Pin the image to IPFS
+    // 3.2) Pin the PNG to IPFS via Pinata
     console.log('→ Pinning image to IPFS...')
-    // Create a readable stream from buffer
     const { Readable } = await import('stream')
     const imgStream = new Readable()
     imgStream.push(imgBuffer)
@@ -90,12 +85,16 @@ async function main() {
     const imageCID = pinFileRes.IpfsHash
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3) Build metadata JSON that points to the PNG’s CID (never to itself)
+    // 3.3) Build metadata JSON pointing at the PNG CID
+    //      *Note:* We’ll also set an HTTP gateway field for immediate availability.
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
+      // Use ipfs:// for “native” but we’ll update the on-chain URI to an HTTPS gateway
       image: `ipfs://${imageCID}`,
       animation_url: `ipfs://${imageCID}`,
+      // Add a direct-HTTPS fallback so Zora/Browsers never hit IPFS protocol
+      image_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
       properties: {
         updateInterval: "5m",
@@ -109,16 +108,16 @@ async function main() {
       ]
     }
 
-    // 4) Pin that metadata JSON to IPFS
-    console.log('→ Pinning metadata JSON to IPFS...')
+    // 3.4) Pin metadata JSON to IPFS
+    console.log('→ Pinning metadata JSON to Pinata...')
     const pinJsonRes = await pinata.pinJSONToIPFS(metadata, {
       pinataMetadata: { name: `creeper-metadata-${timestamp}.json` }
     })
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 5) Push the new metadata URI on‐chain
-    const newURI = `ipfs://${metadataCID}`
+    // 3.5) Update coin URI on-chain—pointing to the Cloudflare gateway version
+    const newURI = `https://cloudflare-ipfs.com/ipfs/${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
     const result = await updateCoinURI(
@@ -126,23 +125,22 @@ async function main() {
       walletClient,
       publicClient
     )
-
     console.log('✓ Transaction submitted:', result.hash)
     console.log('✅ Creeper coin metadata updated successfully!')
 
-    // 6) Log a summary
-    console.log('\n📊 Update Summary:')
-    console.log(`- Image:    ipfs://${imageCID}`)
-    console.log(`- Metadata: ipfs://${metadataCID}`)
-    console.log(`- Tx:       ${result.hash}`)
-    console.log(`- At:       ${new Date().toISOString()}`)
+    // 3.6) Log a brief summary
+    console.log('\n📊 Summary:')
+    console.log(`- PNG (IPFS):        ipfs://${imageCID}`)
+    console.log(`- Metadata (IPFS):   ipfs://${metadataCID}`)
+    console.log(`- Metadata (HTTPS):  ${newURI}`)
+    console.log(`- Tx Hash:           ${result.hash}`)
+    console.log(`- Timestamp:         ${new Date().toISOString()}`)
 
   } catch (err) {
     console.error('\n❌ Error in coindeploy.js:', err.message)
-    console.error('Stack trace:', err.stack)
+    console.error(err.stack)
     process.exit(1)
   }
 }
 
-// Run it
 main()
