@@ -2,7 +2,8 @@
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
-import pinataSDK from '@pinata/sdk'
+// Change here: import as PinataSDK (capital P)
+import PinataSDK from '@pinata/sdk'
 import { updateCoinURI } from '@zoralabs/coins-sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -36,7 +37,8 @@ const {
 } = process.env
 
 // ─── 2. Initialize Pinata & Viem clients ───────────────────────────────────────
-const pinata = new pinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+// Use `new PinataSDK(...)` instead of calling pinataSDK(...) directly
+const pinata = new PinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
 
 const publicClient = createPublicClient({
   chain: base,
@@ -115,7 +117,7 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain—use HTTPS gateway instead of ipfs://
+    // 3.5) Update coin URI on-chain—use HTTPS gateway
     const newURI = `https://cloudflare-ipfs.com/ipfs/${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
