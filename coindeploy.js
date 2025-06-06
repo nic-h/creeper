@@ -2,7 +2,6 @@
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
-// Change here: import as PinataSDK (capital P)
 import PinataSDK from '@pinata/sdk'
 import { updateCoinURI } from '@zoralabs/coins-sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
@@ -37,7 +36,6 @@ const {
 } = process.env
 
 // ─── 2. Initialize Pinata & Viem clients ───────────────────────────────────────
-// Use `new PinataSDK(...)` instead of calling pinataSDK(...) directly
 const pinata = new PinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
 
 const publicClient = createPublicClient({
@@ -91,7 +89,7 @@ async function main() {
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Native IPFS reference (for completeness)
+      // Native IPFS reference
       image: `ipfs://${imageCID}`,
       animation_url: `ipfs://${imageCID}`,
       // HTTPS fallback so Zora and browsers do not need IPFS protocol
@@ -117,8 +115,8 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain—use HTTPS gateway
-    const newURI = `https://cloudflare-ipfs.com/ipfs/${metadataCID}`
+    // 3.5) Update coin URI on-chain (must be ipfs://<CID> per Zora SDK)
+    const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
     const result = await updateCoinURI(
@@ -131,11 +129,10 @@ async function main() {
 
     // 3.6) Log a summary
     console.log('\n📊 Update Summary:')
-    console.log(`- PNG (IPFS):        ipfs://${imageCID}`)
-    console.log(`- Metadata (IPFS):   ipfs://${metadataCID}`)
-    console.log(`- Metadata (HTTPS):  ${newURI}`)
-    console.log(`- Tx Hash:           ${result.hash}`)
-    console.log(`- Timestamp:         ${new Date().toISOString()}`)
+    console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
+    console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
+    console.log(`- Tx Hash:         ${result.hash}`)
+    console.log(`- Timestamp:       ${new Date().toISOString()}`)
 
   } catch (err) {
     console.error('\n❌ Error in coindeploy.js:', err.message)
