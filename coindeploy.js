@@ -1,4 +1,4 @@
-// coindeploy.js
+// File: coindeploy.js
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
@@ -88,7 +88,7 @@ async function main() {
     const imageCID = imageAddResult.cid.toString()
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG over HTTP
+    // 3.3) Build metadata JSON pointing at the PNG over IPFS
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
