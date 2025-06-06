@@ -1,9 +1,5 @@
 {
   "name": "CREEPER",
   "description": "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-  "image": "https://creeper-7pr1.onrender.com/latest.png",
-  "properties": {
-    "updateInterval": "5m",
-    "layout": "2x2"
-  }
+  "image": "https://creeper-7pr1.onrender.com/latest.png"
 }
