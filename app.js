@@ -55,7 +55,8 @@ async function generateGrid() {
     const y = row * GRID
 
     try {
-      const resp = await fetch(`${cam.url}?t=${Date.now()}`)
+      const url = cam.url.replace('COUNTER', Date.now())
+      const resp = await fetch(url)
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 
       const buffer = await resp.buffer()
