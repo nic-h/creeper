@@ -10,7 +10,7 @@ dotenv.config()
 const app = express()
 
 // ─── Config ────────────────────────────────────────────────────────────────────
-const CAMERAS = JSON.parse(process.env.CAMERAS)
+const CAMERAS = JSON.parse(process.env.CAMERAS || '[]')
 const PORT = Number(process.env.PORT) || 3000
 const SIZE = 2048
 const GRID = SIZE / 2      // 2×2 → each cell is 1024×1024
@@ -47,7 +47,7 @@ async function generateGrid() {
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, SIZE, SIZE)
 
-  for (let i = 0; i < CAMERAS.length; i++) {
+  for (let i = 0; i < Math.min(CAMERAS.length, 4); i++) {
     const cam = CAMERAS[i]
     const row = Math.floor(i / 2)
     const col = i % 2
@@ -57,16 +57,30 @@ async function generateGrid() {
     try {
       const url = cam.url.replace('COUNTER', Date.now())
       console.log(`Fetching camera ${i}: ${url}`)
-      const resp = await fetch(url)
+      const resp = await fetch(url, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Creeper-CCTV-Bot/1.0'
+        }
+      })
+      
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 
       const buffer = await resp.buffer()
       const img = await loadImage(buffer)
       ctx.drawImage(img, x, y, GRID, GRID)
       drawLabel(ctx, cam.location, x + 10, y + 10)
-      console.log(`✅ Camera ${i} loaded successfully`)
+      console.log(`✅ Camera ${i} (${cam.location}) loaded successfully`)
     } catch (err) {
       console.error(`❌ [cam ${i}] Error:`, err.message)
+      // Fill with placeholder when camera fails
+      ctx.fillStyle = '#333'
+      ctx.fillRect(x, y, GRID, GRID)
+      ctx.fillStyle = '#666'
+      ctx.font = '32px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('Camera Offline', x + GRID/2, y + GRID/2)
+      drawLabel(ctx, cam.location, x + 10, y + 10)
     }
   }
 
@@ -86,6 +100,7 @@ async function generateGrid() {
 ;(async () => {
   try {
     console.log('📸 Starting snapshot generation...')
+    console.log(`📷 Cameras configured: ${CAMERAS.length}`)
     const imgPath = await generateGrid()
     console.log(`✅ ${OUTPUT_IMG} written (${imgPath})`)
 
@@ -93,7 +108,7 @@ async function generateGrid() {
       console.log('🔄 Generating new snapshot...')
       try {
         const newPath = await generateGrid()
-        console.log(`✅ ${OUTPUT_IMG} written (${newPath})`)
+        console.log(`✅ ${OUTPUT_IMG} updated (${newPath})`)
       } catch (err) {
         console.error('❌ Error during scheduled snapshot:', err)
       }
@@ -113,11 +128,26 @@ app.get('/latest.png', (req, res) => {
   }
 })
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    cameras: CAMERAS.length,
+    lastUpdate: fs.existsSync(path.resolve(OUTPUT, OUTPUT_IMG)) 
+      ? fs.statSync(path.resolve(OUTPUT, OUTPUT_IMG)).mtime 
+      : null
+  })
+})
+
 // (Optional) Serve a static metadata JSON at /metadata.json
 app.get('/metadata.json', (req, res) => {
-  const json = fs.readFileSync(path.resolve('metadata.json'), 'utf8')
-  res.setHeader('Content-Type', 'application/json')
-  res.end(json)
+  try {
+    const json = fs.readFileSync(path.resolve('metadata.json'), 'utf8')
+    res.setHeader('Content-Type', 'application/json')
+    res.end(json)
+  } catch (err) {
+    res.status(404).json({ error: 'Metadata file not found' })
+  }
 })
 
 // Start HTTP server
@@ -125,4 +155,8 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`)
   console.log(`📷 Cameras configured: ${CAMERAS.length}`)
   console.log(`🔄 Snapshot interval: ${INTERVAL / 1000 / 60} minutes`)
+  console.log(`🌐 Endpoints available:`)
+  console.log(`   - GET /latest.png (current grid image)`)
+  console.log(`   - GET /health (system status)`)
+  console.log(`   - GET /metadata.json (token metadata)`)
 })
