@@ -113,8 +113,8 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain (must use ipfs://<CID>)
-    const newURI = `ipfs://${metadataCID}`
+    // 3.5) Update coin URI on-chain via HTTP gateway instead of ipfs://
+    const newURI = `https://ipfs.io/ipfs/${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
     const result = await updateCoinURI(
@@ -128,7 +128,7 @@ async function main() {
     // 3.6) Log a summary
     console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
-    console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
+    console.log(`- Metadata (HTTP): ${newURI}`)
     console.log(`- Tx Hash:         ${result.hash}`)
     console.log(`- Timestamp:       ${new Date().toISOString()}`)
 
