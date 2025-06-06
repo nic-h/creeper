@@ -85,11 +85,10 @@ async function main() {
     const imageCID = pinFileRes.IpfsHash
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG over HTTPS
+    // 3.3) Build metadata JSON pointing at the HTTPS image
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Zora’s front-end will fetch this over HTTPS
       image: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       animation_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
@@ -113,8 +112,12 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) ***KEY CHANGE*** Update coin URI on-chain to HTTP gateway
-    const newURI = `https://ipfs.io/ipfs/${metadataCID}`
+    // ── WAIT 60 SECONDS ── allow public gateways to pick up the new CID
+    console.log('⏳ Waiting 60 seconds for IPFS propagation...')
+    await new Promise(resolve => setTimeout(resolve, 60000))
+
+    // 3.5) Update coin URI on-chain using ipfs://<CID> now that it’s propagated
+    const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
     const result = await updateCoinURI(
@@ -128,7 +131,7 @@ async function main() {
     // 3.6) Log a summary
     console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
-    console.log(`- Metadata (HTTP): ${newURI}`)
+    console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
     console.log(`- Tx Hash:         ${result.hash}`)
     console.log(`- Timestamp:       ${new Date().toISOString()}`)
 
