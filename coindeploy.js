@@ -2,7 +2,6 @@
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
-import { create as createIpfsClient } from 'ipfs-http-client'
 import { updateCoinURI } from '@zoralabs/coins-sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -15,8 +14,7 @@ const requiredEnvVars = [
   'RPC_URL',
   'PRIVATE_KEY',
   'COIN_ADDRESS',
-  'INFURA_IPFS_PROJECT_ID',
-  'INFURA_IPFS_PROJECT_SECRET',
+  'LIGHTHOUSE_API_KEY',
   'IMAGE_URL'
 ]
 
@@ -31,27 +29,11 @@ const {
   RPC_URL,
   PRIVATE_KEY,
   COIN_ADDRESS,
-  INFURA_IPFS_PROJECT_ID,
-  INFURA_IPFS_PROJECT_SECRET,
+  LIGHTHOUSE_API_KEY,
   IMAGE_URL
 } = process.env
 
-// ─── 2. Initialize Infura IPFS client & Viem clients ──────────────────────────
-// Build Basic auth header for Infura
-const auth =
-  'Basic ' +
-  Buffer.from(`${INFURA_IPFS_PROJECT_ID}:${INFURA_IPFS_PROJECT_SECRET}`).toString('base64')
-
-const ipfs = createIpfsClient({
-  host: 'ipfs.infura.io',
-  port: 5001,
-  protocol: 'https',
-  headers: {
-    authorization: auth
-  },
-  timeout: 60000 // 60 second timeout
-})
-
+// ─── 2. Initialize Viem clients ──────────────────────────────────────────────
 const publicClient = createPublicClient({
   chain: base,
   transport: http(RPC_URL)
@@ -63,14 +45,59 @@ const walletClient = createWalletClient({
   account: privateKeyToAccount(PRIVATE_KEY)
 })
 
-// ─── 3. Main update function ───────────────────────────────────────────────────
+// ─── 3. Lighthouse IPFS functions ─────────────────────────────────────────────────
+async function uploadToLighthouse(buffer, filename) {
+  const formData = new FormData()
+  const blob = new Blob([buffer], { type: 'image/jpeg' })
+  formData.append('file', blob, filename)
+
+  const response = await fetch('https://node.lighthouse.storage/api/v0/add', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Lighthouse upload failed: ${response.status} ${error}`)
+  }
+
+  const result = await response.json()
+  return result.Hash
+}
+
+async function uploadJSONToLighthouse(json, filename) {
+  const formData = new FormData()
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' })
+  formData.append('file', blob, filename)
+
+  const response = await fetch('https://node.lighthouse.storage/api/v0/add', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LIGHTHOUSE_API_KEY}`,
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Lighthouse JSON upload failed: ${response.status} ${error}`)
+  }
+
+  const result = await response.json()
+  return result.Hash
+}
+
+// ─── 4. Main update function ───────────────────────────────────────────────────
 async function main() {
   try {
     console.log('🚀 Starting Creeper coin update...')
     console.log(`📸 Image URL: ${IMAGE_URL}`)
     console.log(`🪙 Coin address: ${COIN_ADDRESS}`)
 
-    // 3.1) Download the latest grid PNG (cache-busted)
+    // 4.1) Download the latest grid PNG (cache-busted)
     const imageUrlWithTimestamp = `${IMAGE_URL}?t=${Date.now()}`
     console.log('→ Downloading image from:', imageUrlWithTimestamp)
 
@@ -88,25 +115,21 @@ async function main() {
     const contentType = imgRes.headers.get('content-type')
     console.log(`✓ Image downloaded (Content-Type: ${contentType})`)
 
-    const imgBuffer = await imgRes.buffer()
-    const sizeKB = (imgBuffer.length / 1024).toFixed(1)
+    const imgBuffer = await imgRes.arrayBuffer()
+    const sizeKB = (imgBuffer.byteLength / 1024).toFixed(1)
     console.log(`✓ Image size: ${sizeKB}KB`)
 
     // Validate we actually got an image
-    if (imgBuffer.length < 1000) {
-      throw new Error(`Image too small (${imgBuffer.length} bytes), likely an error response`)
+    if (imgBuffer.byteLength < 1000) {
+      throw new Error(`Image too small (${imgBuffer.byteLength} bytes), likely an error response`)
     }
 
-    // 3.2) Pin the PNG to IPFS via Infura
-    console.log('→ Pinning image to IPFS (Infura)...')
-    const imageAddResult = await ipfs.add(imgBuffer, { 
-      pin: true,
-      timeout: 30000
-    })
-    const imageCID = imageAddResult.cid.toString()
-    console.log('✓ Image pinned to IPFS:', imageCID)
+    // 4.2) Upload the PNG to IPFS via Lighthouse
+    console.log('→ Uploading image to IPFS (Lighthouse)...')
+    const imageCID = await uploadToLighthouse(new Uint8Array(imgBuffer), `creeper-${Date.now()}.jpg`)
+    console.log('✓ Image uploaded to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the PNG on IPFS
+    // 4.3) Build metadata JSON pointing at the PNG on IPFS
     const timestamp = new Date().toISOString()
     const metadata = {
       name: "CREEPER",
@@ -128,20 +151,16 @@ async function main() {
       ]
     }
 
-    // 3.4) Pin metadata JSON to IPFS via Infura
-    console.log('→ Pinning metadata JSON to IPFS (Infura)...')
-    const metadataAddResult = await ipfs.add(JSON.stringify(metadata, null, 2), { 
-      pin: true,
-      timeout: 30000
-    })
-    const metadataCID = metadataAddResult.cid.toString()
-    console.log('✓ Metadata pinned to IPFS:', metadataCID)
+    // 4.4) Upload metadata JSON to IPFS via Lighthouse
+    console.log('→ Uploading metadata JSON to IPFS (Lighthouse)...')
+    const metadataCID = await uploadJSONToLighthouse(metadata, `creeper-metadata-${Date.now()}.json`)
+    console.log('✓ Metadata uploaded to IPFS:', metadataCID)
 
-    // 3.5) Wait ~5 seconds to propagate the JSON CID to public IPFS gateways
-    console.log('⏳ Waiting 5 seconds for IPFS propagation...')
-    await new Promise(resolve => setTimeout(resolve, 5000))
+    // 4.5) Lighthouse is fast, wait 3 seconds for propagation
+    console.log('⏳ Waiting 3 seconds for IPFS propagation...')
+    await new Promise(resolve => setTimeout(resolve, 3000))
 
-    // 3.6) Update coin URI on‐chain with "ipfs://<metadataCID>"
+    // 4.6) Update coin URI on‐chain with "ipfs://<metadataCID>"
     const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
@@ -154,7 +173,7 @@ async function main() {
     console.log('✓ Transaction submitted:', result.hash)
     console.log('✅ Creeper coin metadata updated successfully!')
 
-    // 3.7) Log a summary
+    // 4.7) Log a summary
     console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
     console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
@@ -164,7 +183,7 @@ async function main() {
 
     // Verify the metadata is accessible
     console.log('\n🔍 Verification URLs:')
-    console.log(`- Infura Gateway:  https://ipfs.infura.io/ipfs/${metadataCID}`)
+    console.log(`- Lighthouse:      https://gateway.lighthouse.storage/ipfs/${metadataCID}`)
     console.log(`- Public Gateway:  https://ipfs.io/ipfs/${metadataCID}`)
 
   } catch (err) {
@@ -174,8 +193,8 @@ async function main() {
     // More specific error handling
     if (err.message.includes('fetch')) {
       console.error('💡 Image download failed - check IMAGE_URL and network connectivity')
-    } else if (err.message.includes('IPFS') || err.message.includes('Infura')) {
-      console.error('💡 IPFS upload failed - check Infura credentials and network')
+    } else if (err.message.includes('Lighthouse')) {
+      console.error('💡 Lighthouse upload failed - check LIGHTHOUSE_API_KEY')
     } else if (err.message.includes('viem') || err.message.includes('updateCoinURI')) {
       console.error('💡 Blockchain transaction failed - check RPC_URL, PRIVATE_KEY, and COIN_ADDRESS')
     }
