@@ -89,7 +89,7 @@ async function main() {
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      // Use HTTPS gateway so Zora’s UI fetches over HTTP
+      // Zora’s front-end will fetch this over HTTPS
       image: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       animation_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
@@ -113,7 +113,7 @@ async function main() {
     const metadataCID = pinJsonRes.IpfsHash
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // 3.5) Update coin URI on-chain via HTTP gateway instead of ipfs://
+    // 3.5) ***KEY CHANGE*** Update coin URI on-chain to HTTP gateway
     const newURI = `https://ipfs.io/ipfs/${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
