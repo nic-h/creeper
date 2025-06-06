@@ -2,7 +2,7 @@
 
 import fetch from 'node-fetch'
 import dotenv from 'dotenv'
-import PinataSDK from '@pinata/sdk'
+import { create as createIpfsClient } from 'ipfs-http-client'
 import { updateCoinURI } from '@zoralabs/coins-sdk'
 import { createPublicClient, createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -15,8 +15,8 @@ const requiredEnvVars = [
   'RPC_URL',
   'PRIVATE_KEY',
   'COIN_ADDRESS',
-  'PINATA_API_KEY',
-  'PINATA_API_SECRET',
+  'INFURA_IPFS_PROJECT_ID',
+  'INFURA_IPFS_PROJECT_SECRET',
   'IMAGE_URL'
 ]
 
@@ -30,13 +30,26 @@ const {
   RPC_URL,
   PRIVATE_KEY,
   COIN_ADDRESS,
-  PINATA_API_KEY,
-  PINATA_API_SECRET,
+  INFURA_IPFS_PROJECT_ID,
+  INFURA_IPFS_PROJECT_SECRET,
   IMAGE_URL
 } = process.env
 
-// ─── 2. Initialize Pinata & Viem clients ───────────────────────────────────────
-const pinata = new PinataSDK(PINATA_API_KEY, PINATA_API_SECRET)
+// ─── 2. Initialize Infura IPFS client & Viem clients ──────────────────────────
+// Construct Basic auth header for Infura IPFS
+const auth =
+  'Basic ' +
+  Buffer.from(`${INFURA_IPFS_PROJECT_ID}:${INFURA_IPFS_PROJECT_SECRET}`).toString('base64')
+
+// Create Infura IPFS client
+const ipfs = createIpfsClient({
+  host: 'ipfs.infura.io',
+  port: 5001,
+  protocol: 'https',
+  headers: {
+    authorization: auth
+  }
+})
 
 const publicClient = createPublicClient({
   chain: base,
@@ -71,26 +84,21 @@ async function main() {
     const sizeKB = (imgBuffer.length / 1024).toFixed(1)
     console.log(`✓ Image size: ${sizeKB}KB`)
 
-    // 3.2) Pin the PNG to IPFS via Pinata
-    console.log('→ Pinning image to IPFS...')
-    const { Readable } = await import('stream')
-    const imgStream = new Readable()
-    imgStream.push(imgBuffer)
-    imgStream.push(null)
-
-    const timestamp = Date.now()
-    const pinFileRes = await pinata.pinFileToIPFS(imgStream, {
-      pinataMetadata: { name: `creeper-${timestamp}.jpg` }
+    // 3.2) Pin the PNG to IPFS via Infura
+    console.log('→ Pinning image to IPFS (Infura)...')
+    const imageAddResult = await ipfs.add(imgBuffer, {
+      pin: true
     })
-    const imageCID = pinFileRes.IpfsHash
+    const imageCID = imageAddResult.cid.toString()
     console.log('✓ Image pinned to IPFS:', imageCID)
 
-    // 3.3) Build metadata JSON pointing at the HTTPS image
+    // 3.3) Build metadata JSON pointing at the PNG over HTTPS
     const metadata = {
       name: "CREEPER",
       description: "Creeper is a 4 x CCTV Camera work that updates every five minutes",
-      image: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
-      animation_url: `https://cloudflare-ipfs.com/ipfs/${imageCID}`,
+      // Zora’s front‐end needs an HTTPS image URL, but we'll embed ipfs:// for image; Zora will load the JSON over IPFS.
+      image: `ipfs://${imageCID}`,
+      animation_url: `ipfs://${imageCID}`,
       external_url: "https://github.com/nic-h/creeper",
       properties: {
         updateInterval: "5m",
@@ -104,19 +112,19 @@ async function main() {
       ]
     }
 
-    // 3.4) Pin metadata JSON to IPFS
-    console.log('→ Pinning metadata JSON to IPFS...')
-    const pinJsonRes = await pinata.pinJSONToIPFS(metadata, {
-      pinataMetadata: { name: `creeper-metadata-${timestamp}.json` }
+    // 3.4) Pin metadata JSON to IPFS via Infura
+    console.log('→ Pinning metadata JSON to IPFS (Infura)...')
+    const metadataAddResult = await ipfs.add(JSON.stringify(metadata), {
+      pin: true
     })
-    const metadataCID = pinJsonRes.IpfsHash
+    const metadataCID = metadataAddResult.cid.toString()
     console.log('✓ Metadata pinned to IPFS:', metadataCID)
 
-    // ── WAIT 60 SECONDS ── allow public gateways to pick up the new CID
-    console.log('⏳ Waiting 60 seconds for IPFS propagation...')
-    await new Promise(resolve => setTimeout(resolve, 60000))
+    // 3.5) Wait a few seconds for Infura to propagate to public gateways
+    console.log('⏳ Waiting 5 seconds for IPFS propagation...')
+    await new Promise(resolve => setTimeout(resolve, 5000))
 
-    // 3.5) Update coin URI on-chain using ipfs://<CID> now that it’s propagated
+    // 3.6) Update coin URI on-chain using ipfs://<CID>
     const newURI = `ipfs://${metadataCID}`
     console.log('→ Updating coin URI on-chain to:', newURI)
 
@@ -128,7 +136,7 @@ async function main() {
     console.log('✓ Transaction submitted:', result.hash)
     console.log('✅ Creeper coin metadata updated successfully!')
 
-    // 3.6) Log a summary
+    // 3.7) Log a summary
     console.log('\n📊 Update Summary:')
     console.log(`- PNG (IPFS):      ipfs://${imageCID}`)
     console.log(`- Metadata (IPFS): ipfs://${metadataCID}`)
